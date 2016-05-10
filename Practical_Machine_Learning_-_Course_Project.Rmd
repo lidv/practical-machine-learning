@@ -1,0 +1,114 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Dmitry Lishmanov"
+date: 'May 9, 2016'
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data Preparation
+
+First we load the data. If data is pre-downloaded, load it from local working directory, overwise download it first from given URLs
+
+```{r Load data, echo = TRUE}
+if (!file.exists("pml-training.csv")) {
+  download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+}
+if (!file.exists("pml-testing.csv")) {
+  download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+}
+data <- read.csv("pml-training.csv", sep = ",", na.strings = c("", "NA"))
+testData <- read.csv("pml-testing.csv", sep = ",", na.strings = c("", "NA"))
+```
+
+Now, let we reduce the number of features by removing variables with nearly zero variance, variables that are almost always NA, and variables that don’t make intuitive sense for prediction.
+
+```{r Reduce number of features }
+# remove variables with nearly zero variance
+nzv <- nearZeroVar(data)
+data <- data[, -nzv]
+
+# remove variables that are almost always NA
+mostlyNA <- sapply(data, function(x) mean(is.na(x))) > 0.95
+data <- data[, mostlyNA==F]
+
+# remove variables that don't make intuitive sense for prediction (X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp), which happen to be the first five variables
+data <- data[, -(1:5)]
+```
+
+Next, let we use 25% of the dataset for testing after the final model is constructed%
+
+```{r Bootstrap the data}
+set.seed(78)
+inTrain = createDataPartition(data$classe, p = 0.75, list = F)
+training = data[inTrain,]
+testing = data[-inTrain,]
+```
+
+## Model Building
+
+To start with a Random Forest model could be a good idea to see if it would have acceptable performance. We fit the model on training subset and instruct the “train” function to use 3-fold cross-validation to select optimal tuning parameters for the model:
+```{r Random Forest}
+
+# instruct train to use 3-fold CV to select optimal tuning parameters
+fitControl <- trainControl(method="cv", number=3, verboseIter=F)
+
+# fit model on training set
+fit <- train(classe ~ ., data=training, method="rf", trControl=fitControl)
+
+# print final model to check the results
+fit$finalModel
+```
+
+## Model Evaluation
+Now, let we use the fitted model to predict the label (“classe”) in test subset, and show the confusion matrix to compare the predicted versus the actual labels:
+
+```{r Use model for testing set}
+# use model to predict classe in testing set
+preds <- predict(fit, newdata=testing)
+
+# show confusion matrix to get estimate of out-of-sample error
+confusionMatrix(testing$classe, preds)
+```
+
+The accuracy is 99.8%, thus predicted accuracy for the out-of-sample error is 0.2%. This seems to be a very good  result, so rather than trying additional algorithms, we can use Random Forests to predict on the original test set.
+
+## Re-training the Selected Model
+Before predicting on the test set, it is important to train the model on the full training set, rather than using a model trained on a reduced training set, in order to produce the most accurate predictions.
+
+```{r}
+# re-fit model using full training set 
+fitControl <- trainControl(method="cv", number=3, verboseIter=F)
+finalModel <- train(classe ~ ., data=data, method="rf", trControl=fitControl)
+```
+
+## Final submission
+
+Finally we can use the model fit on our training data to predict the label for the observations in test data and write those predictions to individual files:
+
+```{r}
+predictions <- predict(finalModel, newdata=testData)
+
+path = "./submission"
+
+pml_write_files = function(x) {
+    n = length(x)
+    for(i in 1: n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file=file.path(path, filename), 
+                    quote=FALSE, row.names=FALSE, col.names=FALSE)
+    }
+}
+
+pml_write_files(predictions)
+
+```
+
