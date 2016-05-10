@@ -11,10 +11,9 @@ Using devices such as JawboneUp, NikeFuelBand, and Fitbitit is now possible to c
 
 In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website (see the section on the Weight Lifting Exercise Dataset).
 
-
 #HTML report page (gh-pages)
 
-Please open this GitHub link.
+Please open [this GitHub link] (http://lidv.github.io/practical-machine-learning/). 
 
-The HTML file is in the gh-pages branch.
-The R markdown file (Rmd) is in the master branch.
+The HTML file is in the `gh-pages` branch.
+The R markdown file (Rmd) is in the `master` branch.
